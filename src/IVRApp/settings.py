@@ -94,17 +94,17 @@ LOGGING = {
         'fileRequest': {
             'level': 'INFO',
             'class': 'logging.FileHandler',
-            'filename': '/home/solvo/requestlogs.log',
+            'filename': '/home/solvo/ivrlogs/requestlogs.log',
         },
         'fileResponse': {
             'level': 'INFO',
             'class': 'logging.FileHandler',
-            'filename': '/home/solvo/responselogs.log',
+            'filename': '/home/solvo/ivrlogs/responselogs.log',
         },
         'filedebug': {
             'level': 'DEBUG',
             'class': 'logging.FileHandler',
-            'filename': '/home/solvo/debugs.log',
+            'filename': '/home/solvo/ivrlogs/debugs.log',
         },
     },
     'loggers': {

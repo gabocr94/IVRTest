@@ -1,105 +1,98 @@
 import logging
 import stripe
-from django.http import Http404
-from rest_framework import status
+from rest_framework import status, serializers
+from rest_framework.exceptions import ValidationError
 from rest_framework.generics import CreateAPIView
 from rest_framework.response import Response
+from stripe.error import CardError, APIConnectionError, InvalidRequestError, StripeError
 
 from .serializers import charge_create_serializer
 from django.conf import settings
+from ivrpayments.models import Pay_Response
 
-from ivrpayments.models import Pay_Request, Pay_Response
-
-request_log = logging.getLogger('fileRequest')
-response_log = logging.getLogger('fileResponse')
-debug_log = logging.getLogger('debug')
+data_log = logging.getLogger('stripedata')
+debug_log = logging.getLogger('filedebug')
 
 
 class MakePaymentView(CreateAPIView):
-    queryset = Pay_Request.objects.all()
     serializer_class = charge_create_serializer
 
-    def create(self, request, *args, **kwargs):
+    def mask_ccnum(self, cc_num):
+        """
+        masks credit card number
+        :param cc_num:
+        :return: the masked credit card with last 4 numbers visible
+        """
+        cc_num = cc_num.replace(cc_num[0:-4], 'X' * len(cc_num[0:-4]))
+        return cc_num
+
+    def post(self, request, *args, **kwargs):
         """
         Creates the request and response model to the database while sending and receiving data from stripe
         :param request: It has the data from the rest form on the view
         :param args:
         :param kwargs:
-        :return:
+        :return: HTTP code status 201 on create or other HTTP error codes
         """
         if request.method == 'POST':
+
+            # serializer takes post data
+
             stripe.api_key = settings.STRIPE_SECRET_KEY
-            card = request.data['card_num']
-            masked_card = card.replace(card[0:-4],'X'*len(card[0:-4]))
-            pay_req = Pay_Request.objects.create(
-                name=request.data['name'],
-                email=request.data['email'],
-                phone=request.data['phone'],
-                card_num=masked_card,
-                cvc_num=request.data['cvc_num'].replace(request.data['cvc_num'],'X'*len(request.data['cvc_num'])),
-                exp_month=request.data['exp_month'],
-                exp_year=request.data['exp_year'],
-                description=request.data['description'],
-                country=request.data['country'],
-                currency=request.data['currency'],
-                amount=request.data['amount']
+            serializer = self.serializer_class(data=request.data)
 
-            )
-            # Check for any error in the card information
             try:
-                token = stripe.Token.create(
-                    card={
-                        'number': request.data['card_num'],
-                        'exp_month': pay_req.exp_month,
-                        'exp_year': pay_req.exp_year,
-                        'cvc': request.data['cvc_num']
-                    }
-                )
+                if serializer.is_valid():
+                    # Saving and logging the request
 
-                charge = stripe.Charge.create(
-                    source=token,
-                    amount=pay_req.amount,
-                    currency=pay_req.currency,
-                    description=pay_req.description,
-                    receipt_email=pay_req.email
-                )
+                    # Create the token needed fpr the stripe charge
+                    token = stripe.Token.create(
+                        card={
+                            'number': serializer.validated_data.get('card_num'),
+                            'exp_month': serializer.validated_data.get('exp_month'),
+                            'exp_year': serializer.validated_data.get('exp_year'),
+                            'cvc': serializer.validated_data.get('cvc_num'),
+                        }
+                    )
 
-                if charge is not None:
-                    try:
-                        pay_req.cvc_num = 'XXX'
-                        last4 = pay_req.card_num[:-4]
-                        pay_req.card_num = pay_req.card_num[0:-4].replace('X') + last4
-                        pay_req.save()
-                        resp_obj = Pay_Response(
-                            id_response=charge['id'],
-                            currency=charge['currency'],
-                            country=charge['source']['country'],
-                            amount=charge['amount'],
-                            recip_mail=charge['receipt_email'],
-                            description=charge['description'],
-                            paid=charge['paid'],
-                            refunded=charge['refunded'],
-                            card_last4=charge['source']['last4']
-                        )
-                        resp_obj.save()
-                        request_log.info(pay_req)
-                        response_log.info(resp_obj)
-                    except(Http404):
-                        debug_log.debug('Data not found ' + pay_req)
-                    except:
+                    # mask the information once is used and then save
+                    serializer.validated_data['card_num'] = self.mask_ccnum(serializer.validated_data['card_num'])
+                    serializer.validated_data['cvc_num'] = "XXX"
+                    serializer.save()
+                    data_log.info(serializer.validated_data)
+                    charge = stripe.Charge.create(
+                        source=token,
+                        amount=serializer.validated_data.get('amount'),
+                        currency=serializer.validated_data.get('currency'),
 
-                        debug_log.log("Cannot save objects, invalid data \nrequest:",
-                                      + pay_req + '\nresponse' + resp_obj)
-
-
-
+                    )
+                    # Transform charge response into our desired model to be saved in db
+                    resp_obj = Pay_Response(
+                        id_response=charge['id'],
+                        currency=charge['currency'],
+                        amount=charge['amount'],
+                        paid=charge['paid'],
+                        refunded=charge['refunded'],
+                        card_last4=charge['source']['last4']
+                    )
+                    resp_obj.save()
+                    data_log.info(resp_obj)
                 else:
-                    debug_log.debug("Error processing charge: " + charge)
+                    return Response(data='Information is not correct', status=status.HTTP_400_BAD_REQUEST)
 
-            except:
-                debug_log.debug('Card information is not valid')
-                debug_log.debug(token)
+            # Check for any error in the card information or code
 
-            # if the charge is completed, save the request made and the response received
+            except StripeError as e:
+                debug_log.debug(e)
+                return Response(data='Error, please verify your card information',
+                                status=status.HTTP_402_PAYMENT_REQUIRED)
+            except ValidationError as e:
+                debug_log.debug(e)
+                return Response(data=e, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            except Exception as e:
+                debug_log.debug(e)
+                return Response(data=e, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(status=status.HTTP_201_CREATED)
+            return Response(data=charge, status=status.HTTP_201_CREATED)
+        else:
+            return Response(data='Method not allowed', status=status.HTTP_405_METHOD_NOT_ALLOWED)

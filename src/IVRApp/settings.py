@@ -33,14 +33,15 @@ STRIPE_PUBLISHABLE_KEY = 'pk_test_cCb0gLMsng6mHf24m0IHnuCy'
 # Application definition
 
 INSTALLED_APPS = [
-    'ivrpayments',
+    'rest_framework',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'rest_framework',
+    'ivrpayments',
+
 ]
 
 MIDDLEWARE = [
@@ -79,9 +80,9 @@ WSGI_APPLICATION = 'IVRApp.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'IVRSolvo',
-        'USER': 'solvo',
-        'PASSWORD': 'solvop4ss',
+        'NAME': 'IVRTest',
+        'USER': 'testuser',
+        'PASSWORD': 'pass1234',
         'HOST': 'localhost',
         'PORT': '3306',
     }
@@ -92,35 +93,27 @@ LOGGING = {
     'disable_existing_loggers': False,
     'handlers': {
         'fileRequest': {
-            'level': 'INFO',
+            'level': 'DEBUG',
             'class': 'logging.FileHandler',
-            'filename': '/home/solvo/ivrlogs/requestlogs.log',
+            'filename': '/home/gabriel/ivrlogs/stripedata.log',
         },
-        'fileResponse': {
-            'level': 'INFO',
-            'class': 'logging.FileHandler',
-            'filename': '/home/solvo/ivrlogs/responselogs.log',
-        },
+
         'filedebug': {
             'level': 'DEBUG',
             'class': 'logging.FileHandler',
-            'filename': '/home/solvo/ivrlogs/debugs.log',
+            'filename': '/home/gabriel/ivrlogs/debugs.log',
         },
     },
     'loggers': {
+
         'django': {
-            'handlers': ['fileRequest'],
-            'level': 'INFO',
-            'propagate': True,
-        },
-        'django': {
-            'handlers': ['fileResponse'],
+            'handlers': ['stripedata'],
             'level': 'INFO',
             'propagate': True,
         },
         'django': {
             'handlers': ['filedebug'],
-            'level': 'INFO',
+            'level': 'DEBUG',
             'propagate': True,
         },
     },

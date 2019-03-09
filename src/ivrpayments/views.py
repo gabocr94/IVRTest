@@ -76,20 +76,21 @@ class MakePaymentView(CreateAPIView):
                         card_last4=charge['source']['last4']
                     )
                     resp_obj.save()
-                    data_log.info(resp_obj)
+                    data_log.info(charge)
                 else:
                     return Response(data='Information is not correct', status=status.HTTP_400_BAD_REQUEST)
 
             # Check for any error in the card information or code
 
             except StripeError as e:
-                debug_log.debug(e)
+                debug_log.debug('Credit card information is not valid')
                 return Response(data='Error, please verify your card information',
                                 status=status.HTTP_402_PAYMENT_REQUIRED)
             except ValidationError as e:
-                debug_log.debug(e)
-                return Response(data=e, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                debug_log.debug('Validation Error, check information provided')
+                return Response(data=e, status=status.HTTP_400_BAD_REQUEST)
             except Exception as e:
+                debug_log.debug('An error has ocurred')
                 debug_log.debug(e)
                 return Response(data=e, status=status.HTTP_400_BAD_REQUEST)
 

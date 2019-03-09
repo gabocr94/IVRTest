@@ -26,8 +26,6 @@ Next, run django migrations to set up database configuration:
 
     cd IVRTest/src
     python manage.py migrate
-    python manage.py makemigrations
-    python manage.py migrate
 
 After you configured everything, you are ready to test this application.
 

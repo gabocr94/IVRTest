@@ -76,7 +76,7 @@ class MakePaymentView(CreateAPIView):
                         card_last4=charge['source']['last4']
                     )
                     resp_obj.save()
-                    data_log.info(resp_obj)
+                    data_log.info(charge)
                 else:
                     return Response(data='Information is not correct', status=status.HTTP_400_BAD_REQUEST)
 
@@ -88,10 +88,10 @@ class MakePaymentView(CreateAPIView):
                                 status=status.HTTP_402_PAYMENT_REQUIRED)
             except ValidationError as e:
                 debug_log.debug(e)
-                return Response(data=e, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return Response(data='The information is not correct.', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             except Exception as e:
                 debug_log.debug(e)
-                return Response(data=e, status=status.HTTP_400_BAD_REQUEST)
+                return Response(data='An error has ocurred, please provide valid information', status=status.HTTP_400_BAD_REQUEST)
 
             return Response(data=charge, status=status.HTTP_201_CREATED)
         else:
